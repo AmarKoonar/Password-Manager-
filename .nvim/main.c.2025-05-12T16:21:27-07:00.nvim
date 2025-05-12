@@ -81,17 +81,14 @@ void vault_menu(const char *master_password) {
   while (1) {
     printf("\nVault Menu:\n1. Add Password\n2. Change Password\n0. Remove "
            "Password\n3. View Passwords\n9. Exit\n> ");
-
-    choice = 9;
     scanf("%d%*c", &choice);
-    // char input[16];
-    // printf("\nVault Menu:\n1. Add Password\n2. Change Password\n0. Remove "
-    //"Password\n3. View Passwords\n9. Exit\n> ");
-    // fgets(input, sizeof(input), stdin);
-    // if (sscanf(input, "%d", &choice) != 1) {
-    // printf("[!] Invalid input. Please enter a number.\n");
-    // continue;
-    //}
+    char input[16]; // small buffer to hold user input
+printf("\nVault Menu:\n1. Add Password\n2. Change Password\n0. Remove Password\n3. View Passwords\n9. Exit\n> ");
+fgets(input, sizeof(input), stdin);
+if (sscanf(input, "%d", &choice) != 1) {
+    printf("[!] Invalid input. Please enter a number.\n");
+    continue;
+}
     if (choice == 1) {
       printf("Site: ");
       fgets(site, sizeof(site), stdin);

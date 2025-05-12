@@ -79,73 +79,74 @@ void vault_menu(const char *master_password) {
   derive_key_iv(master_password, key, iv);
 
   while (1) {
-    printf("\nVault Menu:\n1. Add Password\n2. Change Password\n0. Remove "
-           "Password\n3. View Passwords\n9. Exit\n> ");
-
-    choice = 9;
-    scanf("%d%*c", &choice);
-    // char input[16];
     // printf("\nVault Menu:\n1. Add Password\n2. Change Password\n0. Remove "
-    //"Password\n3. View Passwords\n9. Exit\n> ");
-    // fgets(input, sizeof(input), stdin);
-    // if (sscanf(input, "%d", &choice) != 1) {
-    // printf("[!] Invalid input. Please enter a number.\n");
-    // continue;
-    //}
-    if (choice == 1) {
-      printf("Site: ");
-      fgets(site, sizeof(site), stdin);
-      site[strcspn(site, "\n")] = 0;
-      printf("Account: ");
-      fgets(account, sizeof(account), stdin);
-      account[strcspn(account, "\n")] = 0;
-      printf("Password: ");
-      fgets(pass, sizeof(pass), stdin);
-      pass[strcspn(pass, "\n")] = 0;
+           //"Password\n3. View Passwords\n9. Exit\n> ");
+           scanf("%d%*c", &choice);
+           char input[16];
+           printf(
+               "\nVault Menu:\n1. Add Password\n2. Change Password\n0. Remove "
+               "Password\n3. View Passwords\n9. Exit\n> ");
+           fgets(input, sizeof(input), stdin);
+           if (sscanf(input, "%d", &choice) != 1) {
+             printf("[!] Invalid input. Please enter a number.\n");
+             continue;
+           }
+           if (choice == 1) {
+             printf("Site: ");
+             fgets(site, sizeof(site), stdin);
+             site[strcspn(site, "\n")] = 0;
+             printf("Account: ");
+             fgets(account, sizeof(account), stdin);
+             account[strcspn(account, "\n")] = 0;
+             printf("Password: ");
+             fgets(pass, sizeof(pass), stdin);
+             pass[strcspn(pass, "\n")] = 0;
 
-      FILE *fp = fopen(VAULT_FILE, "ab");
-      if (!fp) {
-        perror("Vault write failed");
-        continue;
-      }
+             FILE *fp = fopen(VAULT_FILE, "ab");
+             if (!fp) {
+               perror("Vault write failed");
+               continue;
+             }
 
-      char combined[256];
-      snprintf(combined, sizeof(combined), "%s|%s|%s", site, account, pass);
+             char combined[256];
+             snprintf(combined, sizeof(combined), "%s|%s|%s", site, account,
+                      pass);
 
-      unsigned char encrypted[512];
-      int encrypted_len = aes_encrypt((unsigned char *)combined,
-                                      strlen(combined), key, iv, encrypted);
-      fwrite(&encrypted_len, sizeof(int), 1, fp);
-      fwrite(encrypted, 1, encrypted_len, fp);
-      fclose(fp);
+             unsigned char encrypted[512];
+             int encrypted_len =
+                 aes_encrypt((unsigned char *)combined, strlen(combined), key,
+                             iv, encrypted);
+             fwrite(&encrypted_len, sizeof(int), 1, fp);
+             fwrite(encrypted, 1, encrypted_len, fp);
+             fclose(fp);
 
-      printf("[✔] Password added.\n");
-    } else if (choice == 3) {
-      FILE *fp = fopen(VAULT_FILE, "rb");
-      if (!fp) {
-        printf("No passwords stored.\n");
-        continue;
-      }
+             printf("[✔] Password added.\n");
+           } else if (choice == 3) {
+             FILE *fp = fopen(VAULT_FILE, "rb");
+             if (!fp) {
+               printf("No passwords stored.\n");
+               continue;
+             }
 
-      printf("\nStored Passwords:\n");
-      while (!feof(fp)) {
-        int len;
-        if (fread(&len, sizeof(int), 1, fp) != 1)
-          break;
+             printf("\nStored Passwords:\n");
+             while (!feof(fp)) {
+               int len;
+               if (fread(&len, sizeof(int), 1, fp) != 1)
+                 break;
 
-        unsigned char encrypted[512], decrypted[512] = {0};
-        if (fread(encrypted, 1, len, fp) != len)
-          break;
-        aes_decrypt(encrypted, len, key, iv, decrypted);
-        printf("- %s\n", decrypted);
-      }
-      fclose(fp);
-    } else if (choice == 9) {
-      printf("Goodbye!\n");
-      break;
-    } else {
-      printf("Feature not implemented yet.\n");
-    }
+               unsigned char encrypted[512], decrypted[512] = {0};
+               if (fread(encrypted, 1, len, fp) != len)
+                 break;
+               aes_decrypt(encrypted, len, key, iv, decrypted);
+               printf("- %s\n", decrypted);
+             }
+             fclose(fp);
+           } else if (choice == 9) {
+             printf("Goodbye!\n");
+             break;
+           } else {
+             printf("Feature not implemented yet.\n");
+           }
   }
 }
 
