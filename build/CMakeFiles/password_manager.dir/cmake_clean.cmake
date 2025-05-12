@@ -1,6 +1,6 @@
 file(REMOVE_RECURSE
-  "CMakeFiles/password_manager.dir/main.c.o"
-  "CMakeFiles/password_manager.dir/main.c.o.d"
+  "CMakeFiles/password_manager.dir/main1.c.o"
+  "CMakeFiles/password_manager.dir/main1.c.o.d"
   "password_manager"
   "password_manager.pdb"
 )

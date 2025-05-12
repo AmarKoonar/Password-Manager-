@@ -1,1 +1,1 @@
-/usr/bin/clang CMakeFiles/password_manager.dir/main.c.o -o password_manager  /usr/lib/x86_64-linux-gnu/libcrypto.so 
+/usr/bin/clang CMakeFiles/password_manager.dir/main1.c.o -o password_manager  /usr/lib/x86_64-linux-gnu/libcrypto.so 
