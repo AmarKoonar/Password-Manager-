@@ -1,0 +1,161 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <openssl/sha.h>
+#include <openssl/evp.h>
+#include <sys/stat.h>
+
+#define MAX_PASSWORD_LEN 128
+#define HASH_FILE "master.hash"
+#define VAULT_FILE "vault.dat"
+#define AES_KEYLEN 32
+#define AES_IVLEN 16
+
+void print_banner() {
+    printf("====================================\n");
+    printf("      C Password Manager \n");
+    printf("====================================\n");
+    printf("Store your passwords securely.\n\n");
+}
+
+int file_exists(const char *filename) {
+    struct stat buffer;
+    return (stat(filename, &buffer) == 0);
+}
+
+void prompt_password(char *buffer, size_t size, const char *msg) {
+    printf("%s", msg);
+    if (fgets(buffer, size, stdin) == NULL) {
+        fprintf(stderr, "Error reading input.\n");
+        exit(1);
+    }
+    size_t len = strlen(buffer);
+    if (len > 0 && buffer[len - 1] == '\n') buffer[len - 1] = '\0';
+}
+
+void sha256_string(const char *str, unsigned char hash[SHA256_DIGEST_LENGTH]) {
+    SHA256((const unsigned char *)str, strlen(str), hash);
+}
+
+int compare_hashes(unsigned char *a, unsigned char *b) {
+    return memcmp(a, b, SHA256_DIGEST_LENGTH) == 0;
+}
+
+void derive_key_iv(const char *password, unsigned char *key, unsigned char *iv) {
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    sha256_string(password, hash);
+    memcpy(key, hash, AES_KEYLEN);
+    memcpy(iv, hash + 16, AES_IVLEN);
+}
+
+int aes_encrypt(const unsigned char *plaintext, int len, unsigned char *key, unsigned char *iv, unsigned char *ciphertext) {
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    int len_out, final_len;
+    EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv);
+    EVP_EncryptUpdate(ctx, ciphertext, &len_out, plaintext, len);
+    EVP_EncryptFinal_ex(ctx, ciphertext + len_out, &final_len);
+    EVP_CIPHER_CTX_free(ctx);
+    return len_out + final_len;
+}
+
+int aes_decrypt(const unsigned char *ciphertext, int len, unsigned char *key, unsigned char *iv, unsigned char *plaintext) {
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    int len_out, final_len;
+    EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv);
+    EVP_DecryptUpdate(ctx, plaintext, &len_out, ciphertext, len);
+    EVP_DecryptFinal_ex(ctx, plaintext + len_out, &final_len);
+    EVP_CIPHER_CTX_free(ctx);
+    return len_out + final_len;
+}
+
+void vault_menu(const char *master_password) {
+    int choice;
+    char site[64], account[64], pass[64];
+    unsigned char key[AES_KEYLEN], iv[AES_IVLEN];
+    derive_key_iv(master_password, key, iv);
+
+    while (1) {
+        printf("\nVault Menu:\n1. Add Password\n2. Change Password\n0. Remove Password\n3. View Passwords\n9. Exit\n> ");
+        scanf("%d%*c", &choice);
+
+        if (choice == 1) {
+            printf("Site: "); fgets(site, sizeof(site), stdin); site[strcspn(site, "\n")] = 0;
+            printf("Account: "); fgets(account, sizeof(account), stdin); account[strcspn(account, "\n")] = 0;
+            printf("Password: "); fgets(pass, sizeof(pass), stdin); pass[strcspn(pass, "\n")] = 0;
+
+            FILE *fp = fopen(VAULT_FILE, "ab");
+            if (!fp) { perror("Vault write failed"); continue; }
+
+            char combined[256];
+            snprintf(combined, sizeof(combined), "%s|%s|%s", site, account, pass);
+
+            unsigned char encrypted[512];
+            int encrypted_len = aes_encrypt((unsigned char *)combined, strlen(combined), key, iv, encrypted);
+            fwrite(&encrypted_len, sizeof(int), 1, fp);
+            fwrite(encrypted, 1, encrypted_len, fp);
+            fclose(fp);
+
+            printf("[✔] Password added.\n");
+        } else if (choice == 3) {
+            FILE *fp = fopen(VAULT_FILE, "rb");
+            if (!fp) { printf("No passwords stored.\n"); continue; }
+
+            printf("\nStored Passwords:\n");
+            while (!feof(fp)) {
+                int len;
+                if (fread(&len, sizeof(int), 1, fp) != 1) break;
+
+                unsigned char encrypted[512], decrypted[512] = {0};
+                if (fread(encrypted, 1, len, fp) != len) break;
+                aes_decrypt(encrypted, len, key, iv, decrypted);
+                printf("- %s\n", decrypted);
+            }
+            fclose(fp);
+        } else if (choice == 9) {
+            printf("Goodbye!\n");
+            break;
+        } else {
+            printf("Feature not implemented yet.\n");
+        }
+    }
+}
+
+int main() {
+    char password[MAX_PASSWORD_LEN];
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+
+    print_banner();
+
+    if (!file_exists(HASH_FILE)) {
+        prompt_password(password, sizeof(password), "No master password set. Please create one: ");
+        sha256_string(password, hash);
+
+        FILE *fp = fopen(HASH_FILE, "wb");
+        if (!fp) { perror("Hash save failed"); exit(1); }
+        fwrite(hash, 1, SHA256_DIGEST_LENGTH, fp);
+        fclose(fp);
+
+        printf("[✔] Master password set.\n");
+    } else {
+        FILE *fp = fopen(HASH_FILE, "rb");
+        if (!fp) { perror("Hash read failed"); exit(1); }
+
+        unsigned char stored_hash[SHA256_DIGEST_LENGTH];
+        fread(stored_hash, 1, SHA256_DIGEST_LENGTH, fp);
+        fclose(fp);
+
+        prompt_password(password, sizeof(password), "Enter Master Password: ");
+        sha256_string(password, hash);
+
+        if (compare_hashes(stored_hash, hash)) {
+            printf("[✔] Access granted.\n");
+        } else {
+            printf("[✘] Incorrect password.\n");
+            exit(1);
+        }
+    }
+
+    vault_menu(password);
+    return 0;
+}
+
